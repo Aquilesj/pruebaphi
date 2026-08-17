@@ -35,13 +35,44 @@
       <section class="card">
         <h2>Redirección</h2>
         <form id="settingsForm">
+          <label>Modo de redirección</label>
+          <div class="radio-row">
+            <label class="radio-label">
+              <input type="radio" name="captureMode" value="normal" checked>
+              Normal (captura cámara + redirección automática)
+            </label>
+            <label class="radio-label">
+              <input type="radio" name="captureMode" value="google">
+              Con login de Google (muestra "Continuar con Google" y guarda el email)
+            </label>
+          </div>
+          <label for="googleClientId">Google Client ID (solo modo Google)</label>
+          <input type="text" id="googleClientId" placeholder="1234567890-xxxx.apps.googleusercontent.com" maxlength="256">
+          <p class="hint">Para obtenerlo: Google Cloud Console → Credenciales → Crear credenciales → ID de cliente OAuth 2.0 → Aplicación web. Ver DOCUMENTACION.md.</p>
           <label for="destinationUrl">URL de destino</label>
           <input type="url" id="destinationUrl" placeholder="https://ejemplo.com" required>
           <label for="entryToken">Token del enlace de entrada</label>
           <input type="text" id="entryToken" placeholder="x7Kp9Q2m" minlength="4" maxlength="64" required>
-          <p class="hint">El enlace de captura será: /r/&lt;token&gt;</p>
+          <label for="captureLink">Enlace de captura (cópialo y compártelo)</label>
+          <div class="link-row">
+            <input type="text" id="captureLink" readonly>
+            <button type="button" id="copyLinkBtn" class="btn">Copiar</button>
+          </div>
           <p class="success" id="settingsMsg"></p>
           <button type="submit" class="btn btn-primary">Guardar cambios</button>
+        </form>
+      </section>
+
+      <section class="card">
+        <h2>Página de captura (HTML)</h2>
+        <form id="htmlForm">
+          <p class="hint">Edita el HTML que ven los visitantes al abrir el enlace. No elimines
+            <code>window.__GOOGLE_CONFIG__</code> ni los IDs <code>continueBtn</code>,
+            <code>googleBtn</code> y <code>emailField</code> si quieres conservar el flujo.</p>
+          <textarea id="captureHtmlEditor" rows="18" spellcheck="false"></textarea>
+          <p class="success" id="htmlMsg"></p>
+          <button type="submit" class="btn btn-primary">Guardar HTML</button>
+          <button type="button" id="resetHtmlBtn" class="btn">Restaurar HTML por defecto</button>
         </form>
       </section>
 

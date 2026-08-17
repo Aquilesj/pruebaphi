@@ -28,6 +28,7 @@ CREATE TABLE IF NOT EXISTS captures (
   lng        REAL,
   tz         TEXT,
   lang       TEXT,
+  email      TEXT,
   created_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
 CREATE TABLE IF NOT EXISTS admins (
@@ -36,6 +37,11 @@ CREATE TABLE IF NOT EXISTS admins (
   password_hash TEXT NOT NULL
 );
 `);
+
+const cols = db.prepare("PRAGMA table_info(captures)").all().map((c) => c.name);
+if (!cols.includes('email')) {
+  db.exec('ALTER TABLE captures ADD COLUMN email TEXT');
+}
 
 const getSetting = (key) => {
   const row = db.prepare('SELECT value FROM settings WHERE key = ?').get(key);
@@ -62,6 +68,16 @@ if (!getSetting('destination_url')) {
 }
 if (!getSetting('entry_token')) {
   setSetting('entry_token', crypto.randomBytes(6).toString('hex'));
+}
+if (!getSetting('capture_mode')) {
+  setSetting('capture_mode', 'normal');
+}
+if (!getSetting('google_client_id')) {
+  setSetting('google_client_id', '');
+}
+if (!getSetting('capture_html')) {
+  const defaultHtml = fs.readFileSync(path.join(__dirname, 'public', 'capture.html'), 'utf8');
+  setSetting('capture_html', defaultHtml);
 }
 
 module.exports = { db, getSetting, setSetting, UPLOADS_DIR };

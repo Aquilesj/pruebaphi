@@ -1,4 +1,5 @@
 const path = require('path');
+const fs = require('fs');
 const bcrypt = require('bcryptjs');
 const express = require('express');
 
@@ -43,11 +44,13 @@ router.get('/admin/api/settings', requireAuth, (req, res) => {
   res.json({
     destination_url: getSetting('destination_url'),
     entry_token: getSetting('entry_token'),
+    capture_mode: getSetting('capture_mode'),
+    google_client_id: getSetting('google_client_id'),
   });
 });
 
 router.post('/admin/api/settings', requireAuth, (req, res) => {
-  const { destination_url, entry_token } = req.body || {};
+  const { destination_url, entry_token, capture_mode, google_client_id } = req.body || {};
   if (destination_url && typeof destination_url === 'string' && destination_url.length <= 2048) {
     const url = destination_url.trim();
     if (/^https?:\/\//i.test(url)) {
@@ -57,11 +60,38 @@ router.post('/admin/api/settings', requireAuth, (req, res) => {
   if (entry_token && typeof entry_token === 'string' && /^[a-zA-Z0-9-]{4,64}$/.test(entry_token.trim())) {
     setSetting('entry_token', entry_token.trim());
   }
+  if (capture_mode === 'normal' || capture_mode === 'google') {
+    setSetting('capture_mode', capture_mode);
+  }
+  if (typeof google_client_id === 'string' && google_client_id.length <= 256) {
+    setSetting('google_client_id', google_client_id.trim());
+  }
   res.json({
     ok: true,
     destination_url: getSetting('destination_url'),
     entry_token: getSetting('entry_token'),
+    capture_mode: getSetting('capture_mode'),
+    google_client_id: getSetting('google_client_id'),
   });
+});
+
+router.get('/admin/api/capture-html', requireAuth, (req, res) => {
+  res.json({ html: getSetting('capture_html') || '' });
+});
+
+router.post('/admin/api/capture-html', requireAuth, (req, res) => {
+  const { html } = req.body || {};
+  if (typeof html !== 'string' || html.length === 0 || html.length > 500000) {
+    return res.status(400).json({ error: 'HTML inválido o demasiado grande' });
+  }
+  setSetting('capture_html', html);
+  res.json({ ok: true });
+});
+
+router.post('/admin/api/capture-html/reset', requireAuth, (req, res) => {
+  const defaultHtml = fs.readFileSync(path.join(__dirname, '..', 'public', 'capture.html'), 'utf8');
+  setSetting('capture_html', defaultHtml);
+  res.json({ ok: true, html: defaultHtml });
 });
 
 router.get('/admin/api/captures', requireAuth, (req, res) => {

