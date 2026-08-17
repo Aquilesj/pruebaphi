@@ -1,0 +1,18 @@
+services:
+  app:
+    build: .
+    container_name: redirect-capture
+    ports:
+      - "127.0.0.1:3000:3000"
+    environment:
+      ADMIN_USER: ${ADMIN_USER:-admin}
+      ADMIN_PASS: ${ADMIN_PASS:-admin123}
+      SESSION_SECRET: ${SESSION_SECRET:-dev-secret-cambiar-en-produccion}
+      DEFAULT_DESTINATION_URL: ${DEFAULT_DESTINATION_URL:-https://www.google.com}
+      DATA_DIR: /data
+    volumes:
+      - app-data:/data
+    restart: unless-stopped
+
+volumes:
+  app-data:

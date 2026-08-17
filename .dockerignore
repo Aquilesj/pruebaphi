@@ -1,0 +1,10 @@
+node_modules
+npm-debug.log
+.env
+capturas.db
+capturas.db-*
+uploads
+.git
+.gitignore
+.DS_Store
+*.md
