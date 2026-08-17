@@ -11,6 +11,8 @@ ENV NODE_ENV=production \
     PORT=3000 \
     DATA_DIR=/data
 
-EXPOSE 3000
+# 3000: interno (la app escucha aquí, red interna de compose)
+# 443: externo (HTTPS lo termina Caddy, servicio "caddy" con perfil production)
+EXPOSE 3000 443
 
 CMD ["node", "server.js"]
