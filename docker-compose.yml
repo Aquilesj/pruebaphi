@@ -2,6 +2,8 @@ services:
   app:
     build: .
     container_name: redirect-capture
+    # Puerto 3000: SOLO interno (red de compose y localhost del host).
+    # Trafico externo entra por 443 (Caddy) -> red interna -> app:3000
     ports:
       - "127.0.0.1:3000:3000"
     environment:
@@ -18,6 +20,8 @@ services:
     image: caddy:2
     container_name: caddy
     profiles: ["production"]
+    # Puerto 443 (y 80 para redirigir a HTTPS): los UNICOS publicos hacia afuera.
+    # Termina TLS (Let's Encrypt) y redirige a la app por la red interna en 3000.
     ports:
       - "80:80"
       - "443:443"
